@@ -20,7 +20,7 @@ public class UserMapper {
     }
 
     public User toDomainUser(UserRecord record) {
-        return User.create(
+        return User.reconstitute(
                 record.id(),
                 record.name(),
                 record.email(),
@@ -30,4 +30,3 @@ public class UserMapper {
         );
     }
 }
-

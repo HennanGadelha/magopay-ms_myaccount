@@ -32,7 +32,11 @@ public class User {
         validateState();
     }
 
-    public static User create(UUID id, String name, String email, String document, String password, UserStatus status) {
+    public static User create(UUID id, String name, String email, String document, String password) {
+        return new User(id, name, email, document, password, UserStatus.IN_ANALYZING);
+    }
+
+    public static User reconstitute(UUID id, String name, String email, String document, String password, UserStatus status) {
         return new User(id, name, email, document, password, status);
     }
 
@@ -138,7 +142,7 @@ public class User {
     }
 
     private static String normalizeAndValidateDocument(String value) {
-        String normalized = normalizeRequired(value);
+        String normalized = normalizeRequired(value).replaceAll("[.\\-]", "");
         if (normalized.isEmpty()) {
             throw new InvalidDocumentException("User document cannot be empty");
         }

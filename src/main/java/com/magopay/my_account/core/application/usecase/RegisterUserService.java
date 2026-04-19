@@ -3,9 +3,9 @@ package com.magopay.my_account.core.application.usecase;
 import com.magopay.my_account.core.application.ports.in.command.RegisterUserCommand;
 import com.magopay.my_account.core.application.ports.in.result.RegisterUserResult;
 import com.magopay.my_account.core.application.ports.in.RegisterUserUseCase;
+import com.magopay.my_account.core.application.ports.out.PasswordEncoderPort;
 import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
 import com.magopay.my_account.core.domain.User;
-import com.magopay.my_account.core.domain.UserStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -20,9 +20,11 @@ public class RegisterUserService implements RegisterUserUseCase {
     private static final String CORRELATION_MDC_KEY = "correlationId";
 
     private final UserRepositoryPort userRepository;
+    private final PasswordEncoderPort passwordEncoder;
 
-    public RegisterUserService(UserRepositoryPort userRepository) {
+    public RegisterUserService(UserRepositoryPort userRepository, PasswordEncoderPort passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -44,8 +46,7 @@ public class RegisterUserService implements RegisterUserUseCase {
                     command.name(),
                     command.email(),
                     command.document(),
-                    command.password(),
-                    UserStatus.IN_ANALYZING
+                    passwordEncoder.encode(command.password())
             );
 
             LOGGER.debug(
