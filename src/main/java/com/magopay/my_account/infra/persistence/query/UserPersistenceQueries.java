@@ -5,6 +5,9 @@ public class UserPersistenceQueries {
             "INSERT INTO users (id, name, email, document, password, status) " +
             "VALUES (?, ?, ?, ?, ?, ?)";
 
+    public static final String SELECT_BY_EMAIL =
+            "SELECT id, name, email, document, password, status FROM users WHERE email = ?";
+
     private UserPersistenceQueries() {
         throw new AssertionError("Cannot instantiate utility class");
     }

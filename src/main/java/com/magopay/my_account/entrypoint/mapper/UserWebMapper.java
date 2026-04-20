@@ -1,8 +1,10 @@
 package com.magopay.my_account.entrypoint.mapper;
 
+import com.magopay.my_account.entrypoint.dto.FindUserByEmailResponse;
 import com.magopay.my_account.entrypoint.dto.RegisterUserRequest;
 import com.magopay.my_account.entrypoint.dto.RegisterUserResponse;
 import com.magopay.my_account.core.application.ports.in.command.RegisterUserCommand;
+import com.magopay.my_account.core.application.ports.in.result.FindUserByEmailResult;
 import com.magopay.my_account.core.application.ports.in.result.RegisterUserResult;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,16 @@ public class UserWebMapper {
                 result.name(),
                 result.email(),
                 result.document()
+        );
+    }
+
+    public FindUserByEmailResponse toFindByEmailResponse(FindUserByEmailResult result) {
+        return new FindUserByEmailResponse(
+                result.id(),
+                result.name(),
+                result.email(),
+                result.document(),
+                result.status()
         );
     }
 }

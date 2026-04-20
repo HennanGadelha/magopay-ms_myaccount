@@ -12,6 +12,10 @@ import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 @Repository
 public class UserRepositoryAdapter implements UserRepositoryPort {
 
@@ -80,5 +84,55 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     private String currentCorrelationId() {
         String correlationId = MDC.get(CORRELATION_MDC_KEY);
         return correlationId == null || correlationId.isBlank() ? "<missing>" : correlationId;
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        String correlationId = currentCorrelationId();
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+
+        LOGGER.debug(
+                "event=user.findByEmail.persistence.started correlationId={}",
+                correlationId
+        );
+
+        try {
+            List<UserRecord> records = jdbcTemplate.query(
+                    UserPersistenceQueries.SELECT_BY_EMAIL,
+                    (rs, rowNum) -> new UserRecord(
+                            UUID.fromString(rs.getString("id")),
+                            rs.getString("name"),
+                            rs.getString("email"),
+                            rs.getString("document"),
+                            rs.getString("password"),
+                            rs.getString("status")
+                    ),
+                    normalizedEmail
+            );
+
+            if (records.isEmpty()) {
+                LOGGER.info(
+                        "event=user.findByEmail.persistence.not_found correlationId={}",
+                        correlationId
+                );
+                return Optional.empty();
+            }
+
+            User user = userMapper.toDomainUser(records.get(0));
+            LOGGER.info(
+                    "event=user.findByEmail.persistence.found correlationId={} userId={}",
+                    correlationId,
+                    user.getId()
+            );
+            return Optional.of(user);
+        } catch (Exception ex) {
+            LOGGER.error(
+                    "event=user.findByEmail.persistence.failed correlationId={} reason={}",
+                    correlationId,
+                    ex.getMessage(),
+                    ex
+            );
+            throw new DomainException("Error finding user by email");
+        }
     }
 }
