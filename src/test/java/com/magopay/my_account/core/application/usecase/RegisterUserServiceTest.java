@@ -3,6 +3,7 @@ package com.magopay.my_account.core.application.usecase;
 import com.magopay.my_account.core.application.ports.in.command.RegisterUserCommand;
 import com.magopay.my_account.core.application.ports.in.result.RegisterUserResult;
 import com.magopay.my_account.core.application.ports.out.PasswordEncoderPort;
+import com.magopay.my_account.core.application.ports.out.UserEventPublisherPort;
 import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
 import com.magopay.my_account.core.domain.User;
 import com.magopay.my_account.core.domain.UserStatus;
@@ -23,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RegisterUserService")
@@ -33,6 +36,9 @@ class RegisterUserServiceTest {
 
     @Mock
     private PasswordEncoderPort passwordEncoder;
+
+    @Mock
+    private UserEventPublisherPort userEventPublisher;
 
     @InjectMocks
     private RegisterUserService service;
@@ -71,6 +77,23 @@ class RegisterUserServiceTest {
             assertThat(result.name()).isEqualTo(NAME);
             assertThat(result.email()).isEqualTo(EMAIL);
             assertThat(result.document()).isEqualTo(DOCUMENT);
+
+            verify(userEventPublisher).publish(any());
+        }
+
+        @Test
+        @DisplayName("deve publicar evento UserCreatedEvent apos salvar usuario")
+        void shouldPublishUserCreatedEventAfterSave() {
+            UUID id = UUID.randomUUID();
+            User savedUser = User.reconstitute(id, NAME, EMAIL, DOCUMENT, HASH, UserStatus.IN_ANALYZING);
+
+            when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            RegisterUserCommand command = new RegisterUserCommand(NAME, EMAIL, DOCUMENT, PASSWORD);
+            service.execute(command);
+
+            verify(userEventPublisher, times(1)).publish(any());
         }
 
         @Test

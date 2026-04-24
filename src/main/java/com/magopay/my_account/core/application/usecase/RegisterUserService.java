@@ -5,7 +5,9 @@ import com.magopay.my_account.core.application.ports.in.result.RegisterUserResul
 import com.magopay.my_account.core.application.ports.in.RegisterUserUseCase;
 import com.magopay.my_account.core.application.ports.out.PasswordEncoderPort;
 import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
+import com.magopay.my_account.core.application.ports.out.UserEventPublisherPort;
 import com.magopay.my_account.core.domain.User;
+import com.magopay.my_account.core.domain.event.UserCreatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -21,10 +23,12 @@ public class RegisterUserService implements RegisterUserUseCase {
 
     private final UserRepositoryPort userRepository;
     private final PasswordEncoderPort passwordEncoder;
+    private final UserEventPublisherPort userEventPublisher;
 
-    public RegisterUserService(UserRepositoryPort userRepository, PasswordEncoderPort passwordEncoder) {
+    public RegisterUserService(UserRepositoryPort userRepository, PasswordEncoderPort passwordEncoder, UserEventPublisherPort userEventPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.userEventPublisher = userEventPublisher;
     }
 
     @Override
@@ -64,6 +68,12 @@ public class RegisterUserService implements RegisterUserUseCase {
                     savedUser.getId(),
                     savedUser.getStatus()
             );
+
+            userEventPublisher.publish(new UserCreatedEvent(
+                    savedUser.getId(),
+                    savedUser.getName(),
+                    savedUser.getDocument()
+            ));
 
             return new RegisterUserResult(
                     savedUser.getId(),

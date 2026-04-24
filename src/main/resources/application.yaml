@@ -8,3 +8,8 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
+aws:
+  sqs:
+    endpoint: ${AWS_SQS_ENDPOINT:http://localhost:4566}
+    queue:
+      user-events: ${AWS_SQS_QUEUE_USER_EVENTS:http://localhost:4566/000000000000/user-events-queue}
