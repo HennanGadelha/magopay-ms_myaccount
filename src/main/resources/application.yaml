@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: my-account
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:myaccount}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  credentials:
+    access-key-id: ${AWS_ACCESS_KEY_ID:test}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
+  sqs:
+    endpoint: ${AWS_SQS_ENDPOINT:http://localhost:4566}
+    queue:
+      user-events: ${AWS_SQS_QUEUE_USER_EVENTS:http://localhost:4566/000000000000/user-events-queue}
+    publish:
+      retry:
+        max-attempts: ${AWS_SQS_PUBLISH_RETRY_MAX_ATTEMPTS:3}
+        initial-backoff-ms: ${AWS_SQS_PUBLISH_RETRY_INITIAL_BACKOFF_MS:500}
+
+jobs:
+  pending-analysis:
+    fixed-delay-ms: ${JOBS_PENDING_ANALYSIS_FIXED_DELAY_MS:3600000}
