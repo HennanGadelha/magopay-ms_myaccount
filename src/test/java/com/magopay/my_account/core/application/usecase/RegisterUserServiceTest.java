@@ -23,9 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RegisterUserService")
@@ -78,26 +80,47 @@ class RegisterUserServiceTest {
             assertThat(result.email()).isEqualTo(EMAIL);
             assertThat(result.document()).isEqualTo(DOCUMENT);
 
-            verify(userEventPublisher).publish(any());
+            verify(userEventPublisher, times(1)).publish(any());
+            verify(userRepository, never()).updateStatus(any(), any());
         }
 
         @Test
-        @DisplayName("deve publicar evento UserCreatedEvent apos salvar usuario")
-        void shouldPublishUserCreatedEventAfterSave() {
+        @DisplayName("deve marcar ANALYSIS_PENDING quando publish no SQS falhar")
+        void shouldFallbackToAnalysisPendingWhenPublishFails() {
             UUID id = UUID.randomUUID();
             User savedUser = User.reconstitute(id, NAME, EMAIL, DOCUMENT, HASH, UserStatus.IN_ANALYZING);
 
             when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            doThrow(new RuntimeException("sqs unavailable")).when(userEventPublisher).publish(any());
 
             RegisterUserCommand command = new RegisterUserCommand(NAME, EMAIL, DOCUMENT, PASSWORD);
-            service.execute(command);
+            RegisterUserResult result = service.execute(command);
 
-            verify(userEventPublisher, times(1)).publish(any());
+            assertThat(result.id()).isEqualTo(id);
+            verify(userRepository).updateStatus(id, UserStatus.ANALYSIS_PENDING);
         }
 
         @Test
-        @DisplayName("deve propagar excecao quando repositorio falhar")
+        @DisplayName("deve continuar retornando sucesso mesmo se fallback de status falhar")
+        void shouldReturnSuccessEvenWhenFallbackStatusUpdateFails() {
+            UUID id = UUID.randomUUID();
+            User savedUser = User.reconstitute(id, NAME, EMAIL, DOCUMENT, HASH, UserStatus.IN_ANALYZING);
+
+            when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            doThrow(new RuntimeException("sqs unavailable")).when(userEventPublisher).publish(any());
+            doThrow(new RuntimeException("db update error")).when(userRepository).updateStatus(id, UserStatus.ANALYSIS_PENDING);
+
+            RegisterUserCommand command = new RegisterUserCommand(NAME, EMAIL, DOCUMENT, PASSWORD);
+            RegisterUserResult result = service.execute(command);
+
+            assertThat(result.id()).isEqualTo(id);
+            verify(userRepository).updateStatus(id, UserStatus.ANALYSIS_PENDING);
+        }
+
+        @Test
+        @DisplayName("deve propagar excecao quando repositorio falhar no save")
         void shouldPropagateRepositoryException() {
             when(passwordEncoder.encode(anyString())).thenReturn(HASH);
             when(userRepository.save(any(User.class))).thenThrow(new RuntimeException("db error"));

@@ -1,11 +1,11 @@
 package com.magopay.my_account.core.application.usecase;
 
+import com.magopay.my_account.core.application.ports.in.RegisterUserUseCase;
 import com.magopay.my_account.core.application.ports.in.command.RegisterUserCommand;
 import com.magopay.my_account.core.application.ports.in.result.RegisterUserResult;
-import com.magopay.my_account.core.application.ports.in.RegisterUserUseCase;
 import com.magopay.my_account.core.application.ports.out.PasswordEncoderPort;
-import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
 import com.magopay.my_account.core.application.ports.out.UserEventPublisherPort;
+import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
 import com.magopay.my_account.core.domain.User;
 import com.magopay.my_account.core.domain.event.UserCreatedEvent;
 import org.slf4j.Logger;
@@ -61,6 +61,7 @@ public class RegisterUserService implements RegisterUserUseCase {
             );
 
             User savedUser = userRepository.save(user);
+            publishUserCreatedEvent(savedUser, correlationId);
 
             LOGGER.info(
                     "event=user.register.usecase.completed correlationId={} userId={} status={}",
@@ -68,12 +69,6 @@ public class RegisterUserService implements RegisterUserUseCase {
                     savedUser.getId(),
                     savedUser.getStatus()
             );
-
-            userEventPublisher.publish(new UserCreatedEvent(
-                    savedUser.getId(),
-                    savedUser.getName(),
-                    savedUser.getDocument()
-            ));
 
             return new RegisterUserResult(
                     savedUser.getId(),
@@ -91,6 +86,43 @@ public class RegisterUserService implements RegisterUserUseCase {
                     ex
             );
             throw ex;
+        }
+    }
+
+    private void publishUserCreatedEvent(User savedUser, String correlationId) {
+        try {
+            userEventPublisher.publish(new UserCreatedEvent(
+                    savedUser.getId(),
+                    savedUser.getName(),
+                    savedUser.getDocument()
+            ));
+        } catch (RuntimeException publishError) {
+            LOGGER.error(
+                    "event=user.register.sqs.publish.failed correlationId={} userId={} reason={}",
+                    correlationId,
+                    savedUser.getId(),
+                    publishError.getMessage(),
+                    publishError
+            );
+
+            try {
+                savedUser.markAsAnalysisPending();
+                userRepository.updateStatus(savedUser.getId(), savedUser.getStatus());
+                LOGGER.warn(
+                        "event=user.register.status.fallback.applied correlationId={} userId={} status={}",
+                        correlationId,
+                        savedUser.getId(),
+                        savedUser.getStatus()
+                );
+            } catch (RuntimeException statusError) {
+                LOGGER.error(
+                        "event=user.register.status.fallback.failed correlationId={} userId={} reason={}",
+                        correlationId,
+                        savedUser.getId(),
+                        statusError.getMessage(),
+                        statusError
+                );
+            }
         }
     }
 

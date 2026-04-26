@@ -2,6 +2,7 @@ package com.magopay.my_account.infra.persistence.adapter;
 
 import com.magopay.my_account.core.application.ports.out.UserRepositoryPort;
 import com.magopay.my_account.core.domain.User;
+import com.magopay.my_account.core.domain.UserStatus;
 import com.magopay.my_account.core.domain.exception.DomainException;
 import com.magopay.my_account.infra.persistence.dto.UserRecord;
 import com.magopay.my_account.infra.persistence.mapper.UserMapper;
@@ -81,11 +82,6 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
         }
     }
 
-    private String currentCorrelationId() {
-        String correlationId = MDC.get(CORRELATION_MDC_KEY);
-        return correlationId == null || correlationId.isBlank() ? "<missing>" : correlationId;
-    }
-
     @Override
     public Optional<User> findByEmail(String email) {
         String correlationId = currentCorrelationId();
@@ -134,5 +130,102 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
             );
             throw new DomainException("Error finding user by email");
         }
+    }
+
+    @Override
+    public void updateStatus(UUID userId, UserStatus status) {
+        String correlationId = currentCorrelationId();
+
+        LOGGER.debug(
+                "event=user.persistence.updateStatus.started correlationId={} userId={} newStatus={}",
+                correlationId,
+                userId,
+                status
+        );
+
+        try {
+            int rowsAffected = jdbcTemplate.update(
+                    UserPersistenceQueries.UPDATE_STATUS,
+                    status.name(),
+                    userId
+            );
+
+            if (rowsAffected == 0) {
+                LOGGER.warn(
+                        "event=user.persistence.updateStatus.no_rows correlationId={} userId={}",
+                        correlationId,
+                        userId
+                );
+            } else {
+                LOGGER.info(
+                        "event=user.persistence.updateStatus.completed correlationId={} userId={} newStatus={}",
+                        correlationId,
+                        userId,
+                        status
+                );
+            }
+        } catch (Exception ex) {
+            LOGGER.error(
+                    "event=user.persistence.updateStatus.failed correlationId={} userId={} reason={}",
+                    correlationId,
+                    userId,
+                    ex.getMessage(),
+                    ex
+            );
+            throw new DomainException("Error updating user status");
+        }
+    }
+
+    @Override
+    public List<User> findByStatus(UserStatus status) {
+        String correlationId = currentCorrelationId();
+
+        LOGGER.debug(
+                "event=user.persistence.findByStatus.started correlationId={} status={}",
+                correlationId,
+                status
+        );
+
+        try {
+            List<UserRecord> records = jdbcTemplate.query(
+                    UserPersistenceQueries.SELECT_BY_STATUS,
+                    (rs, rowNum) -> new UserRecord(
+                            UUID.fromString(rs.getString("id")),
+                            rs.getString("name"),
+                            rs.getString("email"),
+                            rs.getString("document"),
+                            rs.getString("password"),
+                            rs.getString("status")
+                    ),
+                    status.name()
+            );
+
+            List<User> users = records.stream()
+                    .map(userMapper::toDomainUser)
+                    .toList();
+
+            LOGGER.info(
+                    "event=user.persistence.findByStatus.completed correlationId={} status={} count={}",
+                    correlationId,
+                    status,
+                    users.size()
+            );
+
+            return users;
+        } catch (Exception ex) {
+            LOGGER.error(
+                    "event=user.persistence.findByStatus.failed correlationId={} status={} reason={}",
+                    correlationId,
+                    status,
+                    ex.getMessage(),
+                    ex
+            );
+            throw new DomainException("Error finding users by status");
+        }
+    }
+
+    private String currentCorrelationId() {
+        String correlationId = MDC.get(CORRELATION_MDC_KEY);
+        return correlationId == null || correlationId.isBlank() ? "<missing>" : correlationId;
     }
 }

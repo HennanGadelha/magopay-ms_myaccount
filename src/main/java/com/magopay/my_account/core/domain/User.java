@@ -79,6 +79,11 @@ public class User {
         validateState();
     }
 
+    public void markAsAnalysisPending() {
+        this.status = UserStatus.ANALYSIS_PENDING;
+        validateState();
+    }
+
     public void changeName(String newName) {
         this.name = normalizeAndValidateName(newName);
         validateState();
